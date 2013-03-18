@@ -8,7 +8,8 @@ import java.util.Properties;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.model.Model;
-import org.jboss.maven.extension.dependency.resolver.ArtifactDescriptorResolver;
+import org.apache.maven.model.building.ModelBuildingException;
+import org.jboss.maven.extension.dependency.resolver.EffectiveModelBuilder;
 import org.jboss.maven.extension.dependency.util.VersionPropertyReader;
 import org.sonatype.aether.resolution.ArtifactDescriptorException;
 import org.sonatype.aether.resolution.ArtifactResolutionException;
@@ -39,8 +40,6 @@ public class DepVersionOverrider
 
     private Map<String, String> dependencyVersionOverrides;
 
-    private static ArtifactDescriptorResolver dependencyResolver;
-
     /**
      * Default constructor
      */
@@ -49,6 +48,7 @@ public class DepVersionOverrider
 
     }
 
+    @Override
     public boolean updateModel( Model model )
     {
         Map<String, String> versionOverrides = getVersionOverrides();
@@ -130,6 +130,9 @@ public class DepVersionOverrider
         return OVERRIDE_NAME;
     }
 
+    /**
+     * Get the set of versions which will be used to override local dependency versions.
+     */
     public Map<String, String> getVersionOverrides()
     {
         if ( dependencyVersionOverrides == null )
@@ -146,6 +149,11 @@ public class DepVersionOverrider
         return dependencyVersionOverrides;
     }
 
+    /**
+     * Get dependency management version properties from a remote POM
+     * 
+     * @return Map between the GA of the dependency and the version of the dependency.
+     */
     private Map<String, String> loadRemoteDepVersionOverrides()
     {
         Properties systemProperties = System.getProperties();
@@ -157,7 +165,8 @@ public class DepVersionOverrider
         {
             try
             {
-                versionOverrides = getMavenDepResolver().getRemoteVersionOverrides( depMgmtPomGAV );
+                EffectiveModelBuilder resolver = EffectiveModelBuilder.getInstance();
+                versionOverrides = resolver.getRemoteDependencyVersionOverrides( depMgmtPomGAV );
             }
             catch ( ArtifactResolutionException e )
             {
@@ -167,19 +176,15 @@ public class DepVersionOverrider
             {
                 getLog().warn( "Unable to resolve remote pom: " + e );
             }
+            catch ( ModelBuildingException e )
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
 
         }
 
         return versionOverrides;
-    }
-
-    private static ArtifactDescriptorResolver getMavenDepResolver()
-    {
-        if ( dependencyResolver == null )
-        {
-            dependencyResolver = new ArtifactDescriptorResolver();
-        }
-        return dependencyResolver;
     }
 
 }
